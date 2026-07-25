@@ -84,8 +84,8 @@ Tap the **gear icon** next to Punchy in the Rebble app to open settings. Changes
 
 | Setting | Description |
 |---------|-------------|
-| Export Punch Data | Sends your punch history to Google Sheets and emails you a backup link |
-| Restore from Google Sheets | Reads your punch history back from your sheet and sends it to the watch |
+| Export Punch Data | Sends your punch history and notes to Google Sheets |
+| Restore from Google Sheets | Reads your punch history and notes back from your sheet and sends it to the watch |
 | Google Sheets URL | Your Apps Script web app URL — paste it here once and it's saved |
 
 ---
@@ -109,11 +109,13 @@ Your data goes directly to your own Google account. Nobody else can see it.
 ```javascript
 function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = JSON.parse(e.postData.contents);
-  var rows = data.rows;
+  var data  = JSON.parse(e.postData.contents);
+  var rows  = data.rows;
+  var notes = data.notes || [];
 
+  // Ensure header in row 1
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Date', 'Day', 'Punch In', 'Punch Out', 'Hours', 'Pay', 'Rate', 'Exported']);
+    sheet.appendRow(['Date', 'Day', 'Punch In', 'Punch Out', 'Hours', 'Pay', 'Rate', 'Exported', 'Notes']);
   }
 
   for (var i = 0; i < rows.length; i++) {
@@ -126,6 +128,7 @@ function doPost(e) {
     var pay   = parts[5] || '';
     var rate  = (parts[6] || '').replace('@','');
     var inOut = times.split('-');
+    var note  = notes[i] || '';
     sheet.appendRow([
       month + ' ' + date,
       day,
@@ -134,7 +137,8 @@ function doPost(e) {
       hours,
       pay,
       rate,
-      new Date().toLocaleString()
+      new Date().toLocaleString(),
+      note
     ]);
   }
 
@@ -144,8 +148,8 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var last   = sheet.getLastRow();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var last  = sheet.getLastRow();
 
   if (last <= 1) {
     return ContentService
@@ -153,8 +157,8 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.TEXT);
   }
 
-  // getDisplayValues returns plain strings exactly as shown in the sheet
-  var values = sheet.getRange(2, 1, last - 1, 7).getDisplayValues();
+  // Read 9 columns: Date, Day, In, Out, Hours, Pay, Rate, Exported, Notes
+  var values = sheet.getRange(2, 1, last - 1, 9).getDisplayValues();
 
   return ContentService
     .createTextOutput(JSON.stringify({ rows: values }))
